@@ -1,0 +1,43 @@
+FROM arm64v8/ros:kinetic-robot-xenial
+COPY --from=multiarch/qemu-user-static:x86_64-aarch64 /usr/bin/qemu-* /usr/bin
+
+MAINTAINER Xdaco <xdaco.xinu@gmail.com
+
+ARG SSHKEYPUB
+ARG SSHKEYPVT
+ARG SSHHOSTS
+
+ENV DEBIAN_FRONTEND noninteractive
+
+RUN apt-get update && apt-get dist-upgrade -yq
+
+RUN apt-get install --no-install-recommends git ssh apt-utils \
+    python-catkin-tools locales-all ros-kinetic-backward-ros \ 
+    libyaml-cpp-dev ros-kinetic-desktop-full lsb-release -y
+
+RUN echo "LC_ALL=en_US.UTF-8" >> /etc/environment     && \ 
+    echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen       && \
+    echo "LANG=en_US.UTF-8" > /etc/locale.conf
+
+RUN apt-get install -y locales                        && \
+    locale-gen en_US.UTF-8                            && \
+    update-locale LANG=en_US.UTF-8
+ 
+RUN apt-get autoremove -y                             && \
+    rm -rf /var/lib/apt/lists/*                       && \
+    apt-get update -y
+
+#### optional steps start here to improve performance ####
+
+RUN set -xe                                           && \
+    echo '#!/bin/sh' > /usr/sbin/policy-rc.d          && \
+    echo 'exit 101' >> /usr/sbin/policy-rc.d          && \
+    chmod +x /usr/sbin/policy-rc.d                    && \
+    dpkg-divert --local --rename --add /sbin/initctl  && \
+    cp -a /usr/sbin/policy-rc.d /sbin/initctl         && \
+    sed -i 's/^exit.*/exit 0/' /sbin/initctl          && \
+    echo 'force-unsafe-io' > /etc/dpkg/dpkg.cfg.d/docker-apt-speedup
+
+RUN mkdir -p /run/systemd && echo 'docker' > /run/systemd/container
+
+#### optional steps ends here to improve performance and increase privilege  ####
